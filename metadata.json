@@ -1,0 +1,8 @@
+{
+  "name": "高楼大厦",
+  "description": "基于手势识别的高楼大厦游戏",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+.mirrored {
+  transform: scaleX(-1);
+}

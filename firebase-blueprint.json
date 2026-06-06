@@ -1,0 +1,37 @@
+{
+  "entities": {
+    "LeaderboardEntry": {
+      "title": "LeaderboardEntry",
+      "description": "Records the score for a player's skyscraper",
+      "type": "object",
+      "properties": {
+        "playerName": {
+          "type": "string",
+          "description": "Name of the player"
+        },
+        "score": {
+          "type": "number",
+          "description": "Number of floors built"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the record"
+        },
+        "userId": {
+          "type": "string",
+          "description": "User ID of the player"
+        }
+      },
+      "required": ["playerName", "score", "createdAt", "userId"]
+    }
+  },
+  "firestore": {
+    "/leaderboard/{entryId}": {
+      "schema": {
+        "$ref": "#/entities/LeaderboardEntry"
+      },
+      "description": "Global leaderboard for the skyscraper game"
+    }
+  }
+}

@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Gesture, useGestureRecognizer, detectGesture } from './useGesture';
 import { addScoreToLeaderboard, getTopScores, LeaderboardEntry } from './firebase';
 import { useWebcam } from './useWebcam';
-import { Play, Trophy, Camera, RefreshCw } from 'lucide-react';
+import { Play, Trophy, Camera, RefreshCw, Volume2, VolumeX } from 'lucide-react';
+import { audioSystem } from './audio';
 
 const GESTURE_ICONS: Record<Gesture, string> = {
   rock: '✊',
@@ -24,6 +25,9 @@ function toChineseFloor(n: number) {
 function speak(text: string, rate: number = 1.0): Promise<void> {
   return new Promise((resolve) => {
     window.speechSynthesis.cancel();
+    if (audioSystem.getMuted()) {
+      return resolve();
+    }
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "zh-CN";
     utterance.rate = rate;
@@ -49,8 +53,18 @@ export default function App() {
   
   const [playerName, setPlayerName] = useState('挑战者');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [isMuted, setIsMuted] = useState(false);
   
   const playingRef = useRef(false);
+
+  const handleToggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMuted(prev => {
+      const next = !prev;
+      audioSystem.setMuted(next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     refreshLeaderboard();
@@ -88,6 +102,9 @@ export default function App() {
   const startGame = async () => {
     if (!isReady || !recognizer) return;
     
+    audioSystem.startBGM();
+    audioSystem.playStart();
+
     setAppState('playing');
     setScore(0);
     setPlayerGesture('unknown');
@@ -157,6 +174,7 @@ export default function App() {
     if (pGesture === compGesture || pGesture === 'unknown') {
       // LOSE
       playingRef.current = false;
+      audioSystem.playCollapse();
       setAppState('collapsed');
       setActionText(pGesture === 'unknown' ? '未侦测到手势，塌楼！' : '平局，塌楼！');
       await speak('塌楼！');
@@ -167,6 +185,7 @@ export default function App() {
       }
     } else {
       // WIN
+      audioSystem.playBuildSuccess();
       setScore(currentScore + 1);
       await new Promise(r => setTimeout(r, winWaitTime));
       if (playingRef.current) {
@@ -239,7 +258,13 @@ export default function App() {
             <div className="absolute inset-0 bg-gradient-to-t from-[#050B18] via-transparent to-[#050B18]/50 pointer-events-none"></div>
 
             {/* Support button to close back to name manually? */}
-            <div className="absolute top-4 right-4 z-50">
+            <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+               <button 
+                 onClick={handleToggleMute} 
+                 className="bg-black/50 text-cyan-400 p-2 rounded-full border border-cyan-400/30 hover:bg-cyan-900/50 transition-colors"
+               >
+                 {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+               </button>
                {appState === 'playing' && (
                  <button onClick={(e) => { e.stopPropagation(); stopGame(); }} className="bg-red-500/20 text-red-500 px-4 py-2 rounded-full text-xs font-bold font-mono tracking-widest border border-red-500/30">ABORT</button>
                )}

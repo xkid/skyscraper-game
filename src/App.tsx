@@ -40,7 +40,7 @@ export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   useWebcam(videoRef);
   
-  const [appState, setAppState] = useState<'name_input' | 'ready' | 'playing' | 'gameover'>('name_input');
+  const [appState, setAppState] = useState<'name_input' | 'ready' | 'playing' | 'collapsed' | 'gameover'>('name_input');
   const [score, setScore] = useState(0);
 
   const [actionText, setActionText] = useState('准备建楼！');
@@ -58,9 +58,14 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && (appState === 'ready' || appState === 'gameover')) {
-        e.preventDefault();
-        startGame();
+      if (e.code === 'Space') {
+        if (appState === 'ready' || appState === 'gameover') {
+          e.preventDefault();
+          startGame();
+        } else if (appState === 'collapsed') {
+          e.preventDefault();
+          setAppState('gameover');
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -70,6 +75,8 @@ export default function App() {
   const handleScreenTap = () => {
     if (appState === 'ready' || appState === 'gameover') {
       startGame();
+    } else if (appState === 'collapsed') {
+      setAppState('gameover');
     }
   };
 
@@ -150,7 +157,7 @@ export default function App() {
     if (pGesture === compGesture || pGesture === 'unknown') {
       // LOSE
       playingRef.current = false;
-      setAppState('gameover');
+      setAppState('collapsed');
       setActionText(pGesture === 'unknown' ? '未侦测到手势，塌楼！' : '平局，塌楼！');
       await speak('塌楼！');
       
@@ -243,28 +250,44 @@ export default function App() {
                <div className="flex flex-col items-center">
                  <span className="text-[10px] md:text-xs text-cyan-400 font-mono font-bold tracking-widest uppercase bg-black/60 border border-white/5 px-4 py-1.5 rounded-full backdrop-blur">AI System</span>
                  <div className="mt-4 text-7xl md:text-[100px] drop-shadow-[0_0_20px_rgba(34,211,238,0.5)]">
-                    {appState === 'playing' ? GESTURE_ICONS[computerGesture] : '🤖'}
+                    {(appState === 'playing' || appState === 'collapsed') ? GESTURE_ICONS[computerGesture] : '🤖'}
                  </div>
                </div>
                
                <div className="flex flex-col items-center">
                  <span className="text-[10px] md:text-xs text-purple-400 font-mono font-bold tracking-widest uppercase bg-black/60 border border-white/5 px-4 py-1.5 rounded-full backdrop-blur">{playerName}</span>
                  <div className="mt-4 text-7xl md:text-[100px] drop-shadow-[0_0_20px_rgba(168,85,247,0.5)]">
-                    {appState === 'playing' ? GESTURE_ICONS[playerGesture] : '👤'}
+                    {(appState === 'playing' || appState === 'collapsed') ? GESTURE_ICONS[playerGesture] : '👤'}
                  </div>
                </div>
             </div>
 
             {/* Action Text Area */}
             <div className="absolute top-[30%] left-1/2 -translate-x-1/2 text-center pointer-events-none z-20 w-full px-4">
-               {appState === 'playing' && (
+               {(appState === 'playing' || appState === 'collapsed') && (
                  <motion.h1 
                     key={actionText}
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="text-5xl md:text-7xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-300 uppercase italic drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)]">
+                    className={`text-5xl md:text-7xl font-black tracking-tighter uppercase italic drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)] ${
+                      appState === 'collapsed' 
+                        ? 'text-red-500 bg-none' 
+                        : 'text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-300'
+                    }`}>
                    {actionText}
                  </motion.h1>
+               )}
+               {appState === 'collapsed' && (
+                 <motion.div
+                   initial={{ opacity: 0 }}
+                   animate={{ opacity: 1 }}
+                   transition={{ delay: 2 }}
+                   className="mt-8"
+                 >
+                   <span className="text-xs md:text-sm border border-white/20 bg-black/50 backdrop-blur-md px-6 py-2 rounded-full font-bold text-slate-300 tracking-widest font-mono animate-pulse">
+                     [ TAP OR SPACE FOR LEADERBOARD ]
+                   </span>
+                 </motion.div>
                )}
                {appState === 'ready' && (
                  <h2 className="text-xl md:text-3xl font-black text-white tracking-widest animate-pulse drop-shadow-2xl bg-black/40 border border-white/10 px-8 py-4 rounded-full backdrop-blur-md inline-block">
@@ -274,47 +297,62 @@ export default function App() {
             </div>
 
             {/* Tower Section (Bottom Center) */}
-            <div className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 flex flex-col-reverse items-center w-full max-h-[50vh] gap-1 pb-4 pointer-events-none z-20">
-               {/* Ground Base */}
-               <div className="w-56 md:w-64 h-10 bg-slate-800 border-t-2 border-slate-600 rounded-sm shadow-2xl z-20 flex items-center justify-center">
-                 <span className="text-slate-500 font-black tracking-widest text-[10px] uppercase">FOUNDATION</span>
-               </div>
-               
-               {/* Floors */}
-               <AnimatePresence>
-                 {appState !== 'ready' && Array.from({ length: score }).map((_, i) => {
-                    const isGameOver = appState === 'gameover';
-                    const isTop = i === score - 1;
-                    return (
-                      <motion.div
-                         key={i}
-                         initial={{ y: -100, opacity: 0 }}
-                         animate={isGameOver ? {
-                            y: 800 + (Math.random() * 300), 
-                            rotate: Math.random() * 120 - 60,
-                            opacity: 0,
-                            transition: { duration: 1.5, ease: 'easeIn', delay: i * 0.05 }
-                         } : { 
-                            y: 0, 
-                            opacity: 1,
-                            transition: { type: 'spring', bounce: 0.4 }
-                         }}
-                         exit={{ opacity: 0 }}
-                         className={`h-10 md:h-12 border rounded-sm flex items-center justify-center relative flex-shrink-0 z-10 ${
-                           isTop ? 'bg-blue-600/90 border-cyan-400 border-2 shadow-[0_0_20px_rgba(37,99,235,0.4)]' : 'bg-slate-700/80 border-white/10'
-                         }`}
-                         style={{ width: `${Math.max(100, 160 - (i * 2))}px` }}
-                      >
-                        {/* Windows */}
-                        <span className="absolute -left-12 text-[10px] font-mono text-cyan-400 font-bold">{i + 1}F</span>
-                        <div className="flex gap-2">
-                          <div className={`w-3 md:w-4 h-5 md:h-6 ${isTop ? 'bg-white/40' : 'bg-cyan-400/20 border border-cyan-400/30'}`}></div>
-                          <div className={`w-3 md:w-4 h-5 md:h-6 ${isTop ? 'bg-white/40' : 'bg-cyan-400/20 border border-cyan-400/30'}`}></div>
-                        </div>
-                      </motion.div>
-                    )
-                 })}
-               </AnimatePresence>
+            <div className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 flex flex-col-reverse w-full max-h-[50vh] pb-4 pointer-events-none z-20 overflow-visible">
+               <motion.div 
+                 className="flex flex-col-reverse items-center w-full gap-1"
+                 animate={{ y: score > 5 ? (score - 5) * 48 : 0 }}
+                 transition={{ type: 'spring', bounce: 0.2 }}
+               >
+                 {/* Ground Base */}
+                 <div className="w-56 md:w-64 h-10 flex-shrink-0 bg-slate-800 border-t-2 border-slate-600 rounded-sm shadow-2xl z-20 flex items-center justify-center">
+                   <span className="text-slate-500 font-black tracking-widest text-[10px] uppercase">FOUNDATION</span>
+                 </div>
+                 
+                 {/* Floors */}
+                 <AnimatePresence>
+                   {(appState === 'playing' || appState === 'collapsed') && Array.from({ length: score }).map((_, i) => {
+                      const isGameOver = appState === 'collapsed';
+                      const isTop = i === score - 1;
+                      
+                      // Physical properties for collapse
+                      const dir = i % 2 === 0 ? 1 : -1;
+                      const rotate = dir * (Math.random() * 60 + 30);
+                      const throwX = dir * (Math.random() * 300 + 100);
+
+                      return (
+                        <motion.div
+                           key={i}
+                           initial={{ y: -100, opacity: 0 }}
+                           animate={isGameOver ? {
+                              y: 600 + (Math.random() * 400), 
+                              x: throwX,
+                              rotate: rotate,
+                              opacity: 0,
+                              transition: { duration: 1.8, type: 'spring', bounce: 0.2, delay: i * 0.08 }
+                           } : { 
+                              y: 0, 
+                              x: 0,
+                              rotate: 0,
+                              opacity: 1,
+                              transition: { type: 'spring', bounce: 0.4 }
+                           }}
+                           exit={{ opacity: 0, transition: { duration: 0.2 } }}
+                           className={`h-10 md:h-12 border rounded-sm flex items-center justify-center relative flex-shrink-0 z-10 ${
+                             isTop ? 'bg-blue-600/90 border-cyan-400 border-2 shadow-[0_0_20px_rgba(37,99,235,0.4)]' : 'bg-slate-700/80 border-white/10'
+                           }`}
+                           style={{ width: `${Math.max(100, 160 - (i * 2))}px` }}
+                        >
+                          {/* Windows */}
+                          <span className="absolute -left-12 text-[10px] font-mono text-cyan-400 font-bold">{i + 1}F</span>
+                          <div className="flex gap-2">
+                            <div className={`w-3 md:w-4 h-5 md:h-6 ${isTop ? 'bg-white/40' : 'bg-cyan-400/20 border border-cyan-400/30'}`}></div>
+                            <div className={`w-3 md:w-4 h-5 md:h-6 ${isTop ? 'bg-white/40' : 'bg-cyan-400/20 border border-cyan-400/30'}`}></div>
+                          </div>
+                        </motion.div>
+                      )
+                   })}
+                 </AnimatePresence>
+               </motion.div>
             </div>
             
             {/* Height Display absolute bottom left */}
